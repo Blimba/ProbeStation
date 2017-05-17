@@ -17,6 +17,8 @@
 #       do the entire column g, then from the minimum row of column h, to h3.
 #       Lastly, supply * to loop over all devices on the defined chip.
 #
+#       More explanation can be found in the chip.py documentation
+#
 #       Your experiment script should have two basic functions:
 #
 #       def init(qt):
@@ -43,15 +45,12 @@
 #
 #
 
-# header. does not likely need adjusting regularly
-
 import os
 qtlab_dir = "C:/qtlab"  # the qtlab folder.
 script_dir = "C:/scripts/BartLimburg"  # folder in which the user scripts can be found
 try: os.chdir(script_dir)
 except: raise SystemError("Error: Script directory not found!")
 from imports.chip import *
-from imports.functions import *
 from imports.cascade import Cascade
 try: os.chdir(qtlab_dir)
 except: raise SystemError("Error: QTLab directory not found!")
