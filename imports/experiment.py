@@ -10,6 +10,7 @@ class Experiment(object):
         self._qt = qt
         self._script = script_file
         self._exp = importlib.import_module(script_file)
+        self._exp = importlib.reload(self._exp)
         self._instr = self._exp.init(qt)
         self._name = name
         self._devices = devices
