@@ -176,6 +176,12 @@ class chip:
             d = (d-mod)//base
         return w
 
+    def __iter__(self):
+        return self._run_dev_list.__iter__()
+
+    def __contains__(self, item):
+        return self._run_dev_list.__contains__(item)
+
     def __init__(self, qt, name, **kwargs):
         self._dev_list = {}
         self._test_dev_list = {}
@@ -290,6 +296,7 @@ class chip:
     def _dev_range_to_list(self, device_range):
         m = re.findall(' *,? *([a-zA-Z]+)(\d*)-?([a-zA-Z]*)(\d*)', device_range)
         lst = []
+
         for index, r in enumerate(m):
             r = list(r)
             if not r[0]: continue  # first column should be set
@@ -318,9 +325,10 @@ class chip:
                     _ = self._dev_list[col][d1 - 1]
                     _ = self._dev_list[col][d2 - 1]
                     d_range = self._dev_list[col][d1 - 1:d2]
+                    if len(d_range) < 2:
+                        d_range=range(d_range,d_range+1)
                 except:
-                    if d1 == d2:
-                        d_range = range(d1, d2 + 1)
+                    d_range = range(d1, d2 + 1)
                 for d_index, d in enumerate(d_range):
                     # if not d in self._dev_list
                     dev = col + str(d)
@@ -329,7 +337,8 @@ class chip:
 
         if '*' in device_range:
             for dev in self._dev_list:
-                lst.append(dev)
+                if re.match('\w\d+',dev):
+                    lst.append(dev)
         return lst
 
     def load_template(self, filename, ignore_hidden=True):
@@ -359,13 +368,13 @@ class chip:
             return False
         for line in f:
             m = re.match(
-                ' *(hidden|test|exclude)? *([a-zA-Z0-9\-]+) *, *\( *(\d+) *, *(\d+) *\) *, *\( *(\d+) *, *(\d+) *\) *',
+                ' *(hidden|test|exclude)? *([a-zA-Z0-9\-]+) *, *\( *(-?\d*\.?\d+) *, *(-?\d*\.?\d+) *\) *, *\( *(-?\d*\.?\d+) *, *(-?\d*\.?\d+) *\) *',
                 line)
             if m:
                 g = list(m.groups())
                 if not ignore_hidden:  # just add all devices, do not ignore hidden
                     g[0] = False
-                self.define_devices(g[1], position=(int(g[2]), int(g[3])), pitch=(int(g[4]), int(g[5])),
+                self.define_devices(g[1], position=(float(g[2]), float(g[3])), pitch=(float(g[4]), float(g[5])),
                                     hide_from_range=bool(g[0]))
         f.close()
         return True

@@ -2,7 +2,7 @@
 #   Modular Probe Station Script
 #
 #   Author: Bart Limburg
-#   Version: May 2017
+#   Version: 29 May 2017
 #
 #   Usage:
 #
@@ -42,7 +42,6 @@
 #       def end(qt,instr,name):
 #           This function is called after all devices have been looped over. The qt object "qt", your instruments and the experiment name are passed to the function.
 #           If your instruments require a shutdown command (or you want to terminate other things), do so here.
-#
 #
 
 import os
@@ -141,13 +140,13 @@ current_dev = chip.get_device_from_position(cascade.position)
 #                                           #
 #############################################
 
-cascade.down()  #put the probes down. Ideally, you'd check if they were safe before starting.
+cascade.down()  #put the probes down. Ideally, you'd check if they were safe before starting, but it doesnt look like the cascade supports this.
 
 if start_at_current_position:
     chip.start_at_device(current_dev, run_skipped_devices)  # sort the chip devices list to start at the current device (and either skip the devices or add them to the end of the list)
 
 # loop over all devices that were loaded by the user
-for dev in chip.devices:
+for dev in chip:
     # move the cascade to the new device position
     cascade.move_abs(chip.get_device_position(dev))
     # run the experiments that were loaded by the user
