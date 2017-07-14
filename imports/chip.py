@@ -10,10 +10,10 @@ User callable functions:
 
 ------------------------------------------------------------------------------------------------------------------------
 
-__init__(qt, name, **kwargs):
+__init__(name, **kwargs):
 
 initialises the chip class. Usage:
-c=chip(qt, experiment_name)
+c=chip(experiment_name)
 
 ------------------------------------------------------------------------------------------------------------------------
 
@@ -142,10 +142,10 @@ for the device, and otherwise nothing is returned.
 
 
 import re
-import os
 from imports.experiment import *
 
-class chip:
+
+class Chip:
     def _w2d(self,w):
         '''
         transforms column letter to column number
@@ -182,14 +182,14 @@ class chip:
     def __contains__(self, item):
         return self._run_dev_list.__contains__(item)
 
-    def __init__(self, qt, name, **kwargs):
+    def __init__(self, name, **kwargs):
         self._dev_list = {}
         self._test_dev_list = {}
         self._run_dev_list = []
         self._cols = []
         self._experiments = []
-        self._qt = qt
         self._name = name
+        Experiment.restart()
 
     def define_devices(self, device_square, position=(0,0), pitch=(0,0), hide_from_range=False):
         '''
@@ -379,6 +379,19 @@ class chip:
         f.close()
         return True
 
+    def limit_range(self, device_square):
+        lst = self._dev_square_to_list(device_square)
+        it = [dev for dev in self._dev_list]
+        for dev in it:
+            m = re.match(' *([a-zA-Z]+)([0-9]+) *', dev)
+            if m:
+                if not dev in lst:
+                    del self._dev_list[dev]
+                    try:
+                        self._dev_list[m.group(1)].remove(int(m.group(2)))
+                    except:
+                        pass
+
     def load_devices(self, device_range):
         '''
         generates the device list that should be run by the program.
@@ -438,7 +451,7 @@ class chip:
         :return:
         '''
         device_list = self._dev_square_to_list(devices)
-        exp = Experiment(self._qt, script_file, name=self._name, devices=device_list)
+        exp = Experiment(script_file, name=self._name, devices=device_list)
         self._experiments.append(exp)
         return exp
 

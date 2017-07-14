@@ -3,7 +3,7 @@
 Driver for interfacing the ADWin Gold II with the FEMTO DPLCA 200 current to voltage converter
 
 Author: Bart Limburg (supporting scripts: Xinya Bian, Jan Mol)
-Version: 10/02/2017
+Version: 2 June 2017
 
 Setting up the hardware:
     Connect the ADwin output 1 (or any of your choosing, see below) to probe 1
@@ -14,7 +14,7 @@ Setting up the hardware:
     Correctly ground the FEMTO housing to a common ground.
 
 Driver initialisation:
-    instrument = ADwinFemto(qt)  # loads the instrument with standard parameters, be sure to pass the qt object
+    instrument = ADwinFemto()  # loads the instrument with standard parameters
         possible parameters to edit:
         input_channel = 1  # change to the ADwin ADC channel of your choosing
         output_channel = 1  # change to the ADwin DAC channel of your choosing
@@ -107,14 +107,21 @@ Driver usage:
                         The script went all the way to 10 V and stayed there for 5 seconds without the junction breaking,
                         the junction is too conductive and probably will not burn.
 """
+import qt
 import numpy as np
 
-ADWIN_FLAG_OVERLOAD = int('00000001',2)
-ADWIN_FLAG_UNDERLOAD = int('00000010',2)
-ADWIN_FLAG_BURN_OHMIC = int('00000100',2)
-ADWIN_FLAG_DATA_INCOMPLETE = int('00001000',2)
-ADWIN_FLAG_NO_DATA = int('00010000',2)
-ADWIN_FLAG_ERROR = int('10000000',2)
+ADWIN_FLAG_OVERLOAD             = int('0000000000000001',2)
+ADWIN_FLAG_UNDERLOAD            = int('0000000000000010',2)
+ADWIN_FLAG_DATA_INCOMPLETE      = int('0000000000000100',2)
+ADWIN_FLAG_NO_DATA              = int('0000000000001000',2)
+ADWIN_FLAG_ERROR                = int('1000000000000000',2)
+# Burn trigger flags
+ADWIN_FLAG_BURN_OHMIC           = int('0000000000010000',2) # 16
+ADWIN_FLAG_BURN_R_INCREASE      = int('0000000000100000',2) # 32
+ADWIN_FLAG_BURN_R_THRESHOLD     = int('0000000001000000',2) # 64
+ADWIN_FLAG_BURN_FEEDBACK        = int('0000000010000000',2) # 128
+ADWIN_FLAG_BURN_I_OVERLOAD      = int('0000000100000000',2) # 256
+ADWIN_FLAG_BURN_BREAKPOINT_V    = int('0000001000000000',2) # 512
 
 BUFFER_SIZE = 8e6
 PROCESS_CLOCK = 300e6  # PROCESS CLOCK OF THE ADWIN
@@ -124,7 +131,7 @@ _OVERLOAD_THRESHOLD = 9.5
 
 class ADwinFemto(object):
     loaded=False
-    def __init__(self, qt, input_channel=1, output_channel=1, gate_channel = 2, iv_gain = 9, burn_gain = 4):
+    def __init__(self, drain=1, source=1, gate = 2, iv_gain = 9, burn_gain = 4):
         if not ADwinFemto.loaded:
             ADwinFemto._adwin = qt.instruments.create('adwin_gold_ii', 'ADwin_Gold_II', dev=1)
             # self._adwin.boot()
@@ -138,10 +145,9 @@ class ADwinFemto(object):
             ADwinFemto.loaded=True
         self._adwin = ADwinFemto._adwin
         self._femto = ADwinFemto._femto
-        self.qt = qt
-        self.set_input_channel(input_channel)
-        self.set_output_channel(output_channel)
-        self.set_gate_channel(gate_channel)
+        self.set_input_channel(drain)
+        self.set_output_channel(source)
+        self.set_gate_channel(gate)
         self.iv_gain = iv_gain
         self.burn_gain = burn_gain
         self._busy_par = 'par20' # initial busy parameter (just so that we don't crash)
@@ -188,7 +194,7 @@ class ADwinFemto(object):
             self._adwin.set('par27', 5)
             self._adwin.set('par28', 10)
             
-            self.write(r[0])
+            self.write(r[0],electrode=electrode)
             self._adwin.start_process(3)  # run the sweep_linear program
             while self._adwin.get('par30'): pass  # wait while the adwin program is busy
             count = self._adwin.get('par29')  # count the data
@@ -261,6 +267,8 @@ class ADwinFemto(object):
             v = np.array(self._adwin.get('data1')[start:(count - 1)]) * (20.0 / 65535) - 10.0  # get voltage digit and transform into real units
             i = np.array(self._adwin.get('data2')[start:(count - 1)]) * (20.0 / 65535) - 10.0  # get current digit transform into real units
             # in case autogain was not used, flags can still identify under/overloading
+            if not v and not i:
+                flag |= ADWIN_FLAG_NO_DATA
             if np.max(np.absolute(i)) < _UNDERLOAD_THRESHOLD:
                 flag |= ADWIN_FLAG_UNDERLOAD
             elif np.max(np.absolute(i)) > _OVERLOAD_THRESHOLD:
@@ -271,6 +279,8 @@ class ADwinFemto(object):
             clock = self._adwin.get('par54')
             t = np.array(self._adwin.get('data1')[start:count]) * (clock/PROCESS_CLOCK)  # get voltage digit and transform into real units
             i = np.array(self._adwin.get('data2')[start:count]) * (20.0 / 65535) - 10.0  # get current digit transform into real units
+            if not t and not i:
+                flag |= ADWIN_FLAG_NO_DATA
             if np.max(np.absolute(i)) < _UNDERLOAD_THRESHOLD:
                 flag |= ADWIN_FLAG_UNDERLOAD
             elif np.max(np.absolute(i)) > _OVERLOAD_THRESHOLD:
@@ -280,10 +290,9 @@ class ADwinFemto(object):
             count = self._adwin.get('par39')  # get the amount of datapoints
             v = np.array(self._adwin.get('data1')[:count]) * (20.0 / 65535) - 10.0  # get voltage digit and transform into real units
             i = np.array(self._adwin.get('data2')[:count]) * (20.0 / 65535) - 10.0  # get current digit transform into real units
-            ohmflag = self._adwin.get('par38')  # get the ohmic junction flag
-            flag = 0
-            if ohmflag > 0:
-                flag |= ADWIN_FLAG_BURN_OHMIC
+            flag = self._adwin.get('par37')  # get the burn flags
+            if not v and not i:
+                flag |= ADWIN_FLAG_NO_DATA
             if np.max(np.absolute(i)) < _UNDERLOAD_THRESHOLD:
                 flag |= ADWIN_FLAG_UNDERLOAD
             elif np.max(np.absolute(i)) > _OVERLOAD_THRESHOLD:
@@ -326,7 +335,7 @@ class ADwinFemto(object):
         self._adwin.set('par23' , self._voltage_to_digit(v_min))
         self._adwin.set('par24' , self._voltage_to_digit(v_max))
         # there are num_datapoints-1 steps to do in a linear sweep, set the correct stepsize
-        self._adwin.set('par25' , (self._voltage_to_digit(v_max)-self._voltage_to_digit(v_min))/(num_datapoints-1))
+        self._adwin.set('fpar25' , float(self._voltage_to_digit(v_max)-self._voltage_to_digit(v_min))/float(num_datapoints-1))
         # set the process delay
         processdelay = int(PROCESS_CLOCK * time_per_scan / (num_datapoints*num_average))
         if processdelay < PROCESSDELAY_MINIMUM:
@@ -337,7 +346,7 @@ class ADwinFemto(object):
         # set the number of datapoints to measure
         self._adwin.set('par28', num_datapoints)
         # preset the starting voltage
-        self.write(v_min)
+        self.write(v_min,electrode=electrode)
         self._busy_par = 'par30'
         self._adwin.start_process(3)  # run the sweep_linear program
         if wait_for_complete:
@@ -346,6 +355,8 @@ class ADwinFemto(object):
             i = np.array(self._adwin.get('data2')[:num_datapoints]) * (20.0 / 65535) - 10.0
             # in case autogain was not used, flags can still identify under/overloading
             flag = 0
+            if not v and not i:
+                flag |= ADWIN_FLAG_NO_DATA
             if np.max(np.absolute(i)) < _UNDERLOAD_THRESHOLD:
                 flag |= ADWIN_FLAG_UNDERLOAD
             elif np.max(np.absolute(i)) > _OVERLOAD_THRESHOLD:
@@ -371,7 +382,7 @@ class ADwinFemto(object):
         self.set_gain(self.iv_gain)
         if auto_gain:
             self._auto_gain_iv((v_min,v_max),electrode=electrode)  # sets the gain to be able to record the iv trace
-        self.write(v_start)  # output the starting voltage
+        self.write(v_start,electrode=electrode)  # output the starting voltage
         if electrode == 'gate':
             self._adwin.set('par41', self._gate_channel)
         else:
@@ -412,6 +423,8 @@ class ADwinFemto(object):
             i =  np.array(self._adwin.get('data2')[:count]) * (20.0 / 65535) - 10.0
             # in case autogain was not used, flags can still identify under/overloading
             flag = 0
+            if not v and not i:
+                flag |= ADWIN_FLAG_NO_DATA
             if np.max(np.absolute(i)) < _UNDERLOAD_THRESHOLD:
                 flag |= ADWIN_FLAG_UNDERLOAD
             elif np.max(np.absolute(i)) > _OVERLOAD_THRESHOLD:
@@ -420,44 +433,64 @@ class ADwinFemto(object):
         else:
             return [[],[],ADWIN_FLAG_DATA_INCOMPLETE | ADWIN_FLAG_NO_DATA]
 
+    def eburn(self, v_rate_up = 7.5, v_rate_down = 1, max_voltage = 10, hold_at_10 = 1, feedback_high = 24,
+              feedback_low = 4, feedback_center = 1.5, feedback_steepness = 0.8, threshold_resistance = 1e9,
+              process_delay=3000, wait_for_complete = True):
+        '''
+        runs a cycle of electroburning for the adwin
 
-    def burn(self, cycle_num, ramp_up = 0.5, ramp_down = 150, max_voltage = 10, hold_at_10 = 5, step_frequency = 18000,
-             sigmoid_center = 1.5, sigmoid_steepness = 0.8, sigmoid_high = 20, sigmoid_low = 5,
-             wait_for_complete = True):
-        """
-        parameters for communicating with the adwin
-          'Par_40 = Busy'
-          'Par_31 = input channel'
-          'Par_32 = output channel'
-          'Par_33 = n (number of cycle)'
-          'Par_34 = breakpoint voltage'
-          'Par_35 = hold counter at 10 V
-          'Par_36 = processdelay
+        :param v_rate_up: upwards rate in V/s
+        :param v_rate_down: downwards rate in V/s
+        :param max_voltage: maximum applied voltage in V
+        :param hold_at_10: time to hold at the highest possible voltage
+        :param feedback_high: feedback parameter high value (at low voltage)
+        :param feedback_low:  feedback parameter low value (at high voltage)
+        :param feedback_center: center voltage for switch between high and low with a sigmoidal curve
+        :param feedback_steepness: steepness of the feedback parameter switch between high and low
+        :param threshold_resistance: threshold resistance at which to trigger
+        :param wait_for_complete: wait for the process to complete before proceeding, or proceed with python code while the adwin is busy
+        :return: tuple of V data, I data and flags
 
-          'Par_38 = flag ohmic resistance'
-          'Par_39 = amount of datapoints'
+        adwin communication parameters:
+        pc >> adwin
+        Par_31 = input channel
+        Par_32 = output channel
+        Par_33 = maximum voltage (triggers)
+        Par_34 = hold counter at 10 V
+        Par_35 = process delay
+        FPar31 = ramp up (digits/processdelay)
+        FPar32 = ramp down (digits/processdelay)
+        FPar33 = fb high
+        FPar34 = fb low
+        FPar35 = fb center
+        FPar36 = fb steepness
+        FPar37 = burn gain (in powers)
+        FPar38 = threshold resistance (triggers)
 
-          'FPar_10 = Ramp Up Step
-          'FPar_11 = Ramp Down Step
-          'FPar_12 = sigmoid center
-          'FPar_13 = sigmoid steepness
-          'FPar_14 = approximate left side
-          'FPar_15 = approximate right side
-        """
+        adwin >> pc
+        Par_40 = busy? 1 = process running, 0 = done
+        Par_39 = num datapoints
+        Par_38 = trigger type
+        '''
+
         self.set_gain(self.burn_gain)
+        # change the sigmoidal functions
+        feedback_high *= 10 ** (self.burn_gain - 4)
+        feedback_low *= 10 ** (self.burn_gain - 4)
         # set the required parameters for the script
         self._adwin.set('par31', self._input_channel)
         self._adwin.set('par32', self._output_channel)
-        self._adwin.set('par33', cycle_num)
-        self._adwin.set('par34', self._voltage_to_digit(max_voltage))
-        self._adwin.set('par35', hold_at_10/(step_frequency/PROCESS_CLOCK))
-        self._adwin.set('par36', step_frequency)  # process delay
-        self._adwin.set('fpar10', ramp_up)
-        self._adwin.set('fpar11', ramp_down)
-        self._adwin.set('fpar12', sigmoid_center)
-        self._adwin.set('fpar13', sigmoid_steepness)
-        self._adwin.set('fpar14', sigmoid_high)
-        self._adwin.set('fpar15', sigmoid_low)
+        self._adwin.set('par33', self._voltage_to_digit(max_voltage))
+        self._adwin.set('par34', hold_at_10 / (process_delay / PROCESS_CLOCK))
+        self._adwin.set('par35', process_delay)  # process delay
+        self._adwin.set('fpar31', (v_rate_up * (65535 / 20)) * (process_delay / PROCESS_CLOCK))
+        self._adwin.set('fpar32', (v_rate_down * (65535 / 20)) * (process_delay / PROCESS_CLOCK))
+        self._adwin.set('fpar33', feedback_high)
+        self._adwin.set('fpar34', feedback_low)
+        self._adwin.set('fpar35', feedback_center)
+        self._adwin.set('fpar36', feedback_steepness)
+        self._adwin.set('fpar37', 10 ** self.burn_gain)
+        self._adwin.set('fpar38', threshold_resistance)
         self._busy_par = 'par40'
         self._adwin.start_process(5)
         if wait_for_complete:
@@ -465,10 +498,79 @@ class ADwinFemto(object):
             count = self._adwin.get('par39')  # get the amount of datapoints
             v = np.array(self._adwin.get('data1')[:count]) * (20.0 / 65535) - 10.0  # get voltage digit and transform into real units
             i = np.array(self._adwin.get('data2')[:count]) * (20.0 / 65535) - 10.0  # get current digit transform into real units
-            ohmflag = self._adwin.get('par38')  # get the ohmic junction flag
-            flag = 0
-            if ohmflag > 0:
-                flag |= ADWIN_FLAG_BURN_OHMIC
+            slope = np.array(self._adwin.get('data3')[:count])
+            flag = self._adwin.get('par38')  # get the burn flags
+            if not v and not i:
+                flag |= ADWIN_FLAG_NO_DATA
+            if np.max(np.absolute(i)) < _UNDERLOAD_THRESHOLD:
+                flag |= ADWIN_FLAG_UNDERLOAD
+            elif np.max(np.absolute(i)) > _OVERLOAD_THRESHOLD:
+                flag |= ADWIN_FLAG_OVERLOAD
+            return [v, i * (10 ** (-self.burn_gain)), flag, slope]
+        else:
+            return [[], [], ADWIN_FLAG_DATA_INCOMPLETE | ADWIN_FLAG_NO_DATA, []]
+
+    def burn(self, cycle_num, ramp_up = 0.5, ramp_down = 150, max_voltage = 10, hold_at_10 = 5, process_delay = 18000,
+             sigmoid_center = 1.5, sigmoid_steepness = 0.8, sigmoid_high = 20, sigmoid_low = 5, resistance = -1,
+             threshold_resistance = 1e9, wait_for_complete = True):
+        """
+        !!!!!THIS FUNCTION WILL BE DEPRECATED, USE eburn INSTEAD!!!!!
+
+
+        parameters for communicating with the adwin
+        'Par_40 = Busy'
+        'Par_31 = input channel'
+        'Par_32 = output channel'
+        'Par_33 = n (number of cycle)'
+        'Par_34 = breakpoint voltage'
+        'Par_35 = hold counter at 10 V
+        'Par_36 = processdelay
+        'Par_37 = trigger type
+
+        'Par_38 = flag ohmic resistance'
+        'Par_39 = amount of datapoints'
+
+        'FPar_10 = Ramp Up Step
+        'FPar_11 = Ramp Down Step
+        'FPar_12 = sigmoid center
+        'FPar_13 = sigmoid steepness
+        'FPar_14 = approximate left side
+        'FPar_15 = approximate right side
+        'FPar_16 = burn gain (in powers)
+        'FPar_17 = resistance
+        'FPar_18 = threshold resistance
+        """
+        print('Warning: the function burn will be deprecated and is no longer supported, use eburn instead.')
+        self.set_gain(self.burn_gain)
+        # change the sigmoidal functions
+        sigmoid_high *= 10 ** (self.burn_gain-4)
+        sigmoid_low *= 10 ** (self.burn_gain - 4)
+        # set the required parameters for the script
+        self._adwin.set('par31', self._input_channel)
+        self._adwin.set('par32', self._output_channel)
+        self._adwin.set('par33', cycle_num)
+        self._adwin.set('par34', self._voltage_to_digit(max_voltage))
+        self._adwin.set('par35', hold_at_10/(process_delay/PROCESS_CLOCK))
+        self._adwin.set('par36', process_delay)  # process delay
+        self._adwin.set('fpar10', ramp_up)
+        self._adwin.set('fpar11', ramp_down)
+        self._adwin.set('fpar12', sigmoid_center)
+        self._adwin.set('fpar13', sigmoid_steepness)
+        self._adwin.set('fpar14', sigmoid_high)
+        self._adwin.set('fpar15', sigmoid_low)
+        self._adwin.set('fpar16', 10 ** self.burn_gain)
+        self._adwin.set('fpar17', resistance)
+        self._adwin.set('fpar18', threshold_resistance)
+        self._busy_par = 'par40'
+        self._adwin.start_process(5)
+        if wait_for_complete:
+            while self._adwin.get(self._busy_par): pass  # test the busy parameter until adwin is finished one cycle
+            count = self._adwin.get('par39')  # get the amount of datapoints
+            v = np.array(self._adwin.get('data1')[:count]) * (20.0 / 65535) - 10.0  # get voltage digit and transform into real units
+            i = np.array(self._adwin.get('data2')[:count]) * (20.0 / 65535) - 10.0  # get current digit transform into real units
+            flag = self._adwin.get('par37')  # get the burn flags
+            if not v and not i:
+                flag |= ADWIN_FLAG_NO_DATA
             if np.max(np.absolute(i)) < _UNDERLOAD_THRESHOLD:
                 flag |= ADWIN_FLAG_UNDERLOAD
             elif np.max(np.absolute(i)) > _OVERLOAD_THRESHOLD:
@@ -498,6 +600,8 @@ class ADwinFemto(object):
             t = np.array(self._adwin.get('data1')[:num_datapoints]) * (processdelay/PROCESS_CLOCK)  # get voltage digit and transform into real units
             i = np.array(self._adwin.get('data2')[:num_datapoints]) * (20.0 / 65535) - 10.0  # get current digit transform into real units
             flag = 0
+            if not t and not i:
+                flag |= ADWIN_FLAG_NO_DATA
             if np.max(np.absolute(i)) < _UNDERLOAD_THRESHOLD:
                 flag |= ADWIN_FLAG_UNDERLOAD
             elif np.max(np.absolute(i)) > _OVERLOAD_THRESHOLD:

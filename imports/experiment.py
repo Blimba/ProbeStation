@@ -2,15 +2,20 @@ import importlib
 import time
 import os
 import shutil
+import qt
 
 class Experiment(object):
     _info_file = ''
     _t0=0
-    def __init__(self, qt, script_file, name, devices):
-        self._qt = qt
-        self._script = script_file
+    @staticmethod
+    def restart():
+        Experiment._info_file=''
+        Experiment._t0 = 0
+
+    def __init__(self, script_file, name, devices):
+        self.script = script_file
         self._exp = importlib.import_module(script_file)
-        self._exp = importlib.reload(self._exp)
+        reload(self._exp) # in case the code was changed
         self._instr = self._exp.init(qt)
         self._name = name
         self._devices = devices
@@ -20,15 +25,25 @@ class Experiment(object):
             d.create_file(settings_file=False)
             d.close_file()
             Experiment._info_file = d.get_filepath()
-        Experiment._t0 = time.time()
+            Experiment._t0 = time.time()
         # save the current python script as a copy for future lookup
         shutil.copy(script_file+'.py', os.path.dirname(Experiment._info_file))
 
+    def __contains__(self, item):
+        return item in self._devices
+
+    def get_switch_settings(self):
+        try:
+            settings = self._exp.get_switch_settings
+        except:
+            settings = None
+        return settings
+
     def run(self, device):
         if device in self._devices:
-            print("Running experiment %s on device %s" % (self._script, device))
-            output = [device, str(time.time() - Experiment._t0), self._script]
-            o = self._exp.start(self._qt,self._instr,self._name,device)
+            print("Running experiment %s on device %s" % (self.script, device))
+            output = [device, str(time.time() - Experiment._t0), self.script]
+            o = self._exp.start(qt,self._instr,self._name,device)
             if type(o) is list or type(o) is tuple:
                 for j in range(len(o)):
                     output.append(str(o[j]))
@@ -43,5 +58,5 @@ class Experiment(object):
         return []
 
     def end(self):
-        try: self._exp.end(self._qt, self._instr, self._name)
+        try: self._exp.end(qt, self._instr, self._name)
         except: pass

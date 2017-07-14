@@ -1,18 +1,19 @@
 import re
+import qt
 class Cascade(object):
 
-    def __init__(self,qt):
-        self.qt=qt
+    def __init__(self):
         print('Initialising Cascade...')
         self.instr = qt.instruments.create('cascade','Cascade_Summit_12000')
         print('Cascade initialised.')
         self._position=[0,0]
 
     def move_abs(self,pos): #move the cascade to an absolute position
-        print("moving the head: "+str(pos[0]-self._position[0])+","+str(pos[1]-self._position[1]))
-        self.instr.set('position',[pos[0]-self._position[0],-(pos[1]-self._position[1]),0],rel=True)
-        self.position=pos
-        self.qt.msleep(2)
+        if pos[0] != self._position[0] or pos[1] != self.position[1]:
+            print("moving the head: "+str(pos[0]-self._position[0])+","+str(pos[1]-self._position[1]))
+            self.instr.set('position',[pos[0]-self._position[0],-(pos[1]-self._position[1]),0],rel=True)
+            self.position=pos
+            qt.msleep(2)
 
     def state(self):
         if self.instr.get('contact'):

@@ -1,5 +1,5 @@
 from scipy import stats
-
+import qt
 def add_metric_prefix(d):
     """
     :param d:
@@ -30,19 +30,5 @@ def linear_fit_resistance(Vdata, Idata):
     slope, intercept, r_value, p_value, std_err = stats.linregress(Vdata, Idata)
     return 1 / slope  # return resistance
 
-def create_data_file(qt, name, coordinates, values):
-    dat = qt.Data(name=name)
-    dat.create_file(settings_file=False)  # we don't want heavy 1 MB files to be created alongside of the data file
-    if type(coordinates) is list or type(coordinates) is tuple:
-        for coord in coordinates:
-            dat.add_coordinate(coord)
-    else:
-        dat.add_coordinate(str(coordinates))
-    if type(values) is list or type(values) is tuple:
-        for val in values:
-            dat.add_value(val)
-    else:
-        dat.add_value(str(values))
-
-    return dat
-
+def sleep(seconds):
+    qt.msleep(seconds)
