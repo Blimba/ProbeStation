@@ -49,6 +49,7 @@ script_dir = "C:/scripts/BartLimburg"  # folder in which the user scripts can be
 try: os.chdir(script_dir)
 except: raise SystemError("Error: Script directory not found!")
 from imports.chip import *
+from imports.experiment import *
 from imports.cascade import Cascade
 from imports.arduino import SignalSwitch
 try: os.chdir(qtlab_dir)
