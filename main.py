@@ -25,7 +25,7 @@
 #           In this function, define the instrument(s) that you will use. For example:
 #           return qt.instruments.create('femto_dlpca_200','FEMTO_DLPCA_200',dev=1)
 #           It is possible to return multiple devices, or perform other actions in this function
-#
+#a
 #       def start(instr,name,dev):
 #           This function is called by the main script for every device over which it loops.
 #           The instrument(s) returned by the init function are passed to the function.
