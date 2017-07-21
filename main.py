@@ -18,7 +18,7 @@
 #       Lastly, supply * to loop over all devices on the defined chip.
 #
 #       More explanation can be found in the chip.py documentation
-#
+#a
 #       Your experiment script should have two basic functions:
 #
 #       def init():
