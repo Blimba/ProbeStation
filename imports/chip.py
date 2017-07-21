@@ -372,9 +372,9 @@ class Chip:
         :return True if successful, False if unsuccessful:
         '''
         try:
-            f = open(filename, "r")
+            f = open('templates/%s' % filename, "r")
         except:
-            return False
+            f = open(filename, "r")
         for line in f:
             m = re.match(
                 ' *(hidden|test|exclude)? *([a-zA-Z0-9\-]+) *, *\( *(-?\d*\.?\d+) *, *(-?\d*\.?\d+) *\) *, *\( *(-?\d*\.?\d+) *, *(-?\d*\.?\d+) *\) *',
