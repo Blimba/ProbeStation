@@ -15,7 +15,8 @@ class Experiment(object):
     def __init__(self, script_file, name, devices):
         self.script = script_file
         print 'Importing %s/%s' % (os.getcwd(), script_file)
-        self._exp = importlib.import_module(script_file)
+        try: self._exp = importlib.import_module('experiments.%s' % script_file)
+        except: self._exp = importlib.import_module(script_file)
         reload(self._exp) # in case the code was changed
         self._instr = self._exp.init()
         self._name = name
