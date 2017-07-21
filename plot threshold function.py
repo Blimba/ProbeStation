@@ -1,11 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-sigmoid_center = 1.5
-sigmoid_steepness = 0.8
-sigmoid_high = 20
-sigmoid_low = 4
-d=np.arange(32768,65535)
+sigmoid_center = 1.3
+sigmoid_steepness = 0.6
+sigmoid_high = 25
+sigmoid_low = 3
+d=np.arange(32768,65535,1)
 
 tmp = ((d-32768)/3277) - sigmoid_center
 threshold1 = sigmoid_high*(0.5-(tmp/(sigmoid_steepness+np.abs(tmp)))*0.5)+sigmoid_low

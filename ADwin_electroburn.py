@@ -8,7 +8,7 @@
 """
 from imports.adwin_femto import *
 from imports.functions import add_metric_prefix, linear_fit_resistance
-from imports.data import data
+from imports.data import Data
 # critical resistance at which the junction is considered a tunneling junction
 R_crit = 500e6
 
@@ -61,9 +61,9 @@ def start(instr, name, dev):  # This function is run for every device from main.
     print("Starting electroburning")
     output.append('Starting eburn')
     n = 1
-    info_burn = data(name='%s_burninfo' % name, dev = dev, coordinates='n', values=('R','breakpoint','gain', 'flags'))
-    data_burn = data(name='%s_burn' % name, dev = dev, coordinates=('Vsd','n'), values='Isd')
-    data_R = data(name='%s_R' % name, dev = dev, coordinates=('Vsd','n'), values='Isd')
+    info_burn = Data(name='%s_burninfo' % name, dev = dev, coordinates='n', values=('R','breakpoint','gain', 'flags'))
+    data_burn = Data(name='%s_burn' % name, dev = dev, coordinates=('Vsd','n'), values='Isd')
+    data_R = Data(name='%s_R' % name, dev = dev, coordinates=('Vsd','n'), values='Isd')
 
     data_R.plot2d()
     data_burn.plot2d()
@@ -77,7 +77,7 @@ def start(instr, name, dev):  # This function is run for every device from main.
         # run the burning process (ElectroBurn.bas), returns the sweep data and flags
         [v, i, burn_flags] = instr.burn(n, ramp_up=0.5, ramp_down=150,
                                         max_voltage=bpv,
-                                        sigmoid_high=30,
+                                        sigmoid_high=20,
                                         sigmoid_low=4,
                                         sigmoid_steepness=0.6,
                                         sigmoid_center=1.3,

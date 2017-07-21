@@ -140,7 +140,7 @@ class ADwinFemto(object):
             ADwinFemto._adwin.load_process(self._adwin.compile_process('C:\scripts\ADwin\Standard\ADC.bas', process=2))
             ADwinFemto._adwin.load_process(self._adwin.compile_process('C:\scripts\ADwin\Standard\Sweep_Linear.bas', process=3))
             ADwinFemto._adwin.load_process(self._adwin.compile_process('C:\scripts\ADwin\Standard\Sweep_Triangle.bas', process=4))
-            ADwinFemto._adwin.load_process(self._adwin.compile_process('C:\scripts\ADwin\Standard\ElectroBurn.bas', process=5))
+            ADwinFemto._adwin.load_process(self._adwin.compile_process('C:\scripts\ADwin\Standard\ElectroBurnNew.bas', process=5))
             ADwinFemto._adwin.load_process(self._adwin.compile_process('C:\scripts\ADwin\Standard\ITTrace.bas', process=6))
             ADwinFemto.loaded=True
         self._adwin = ADwinFemto._adwin
@@ -267,7 +267,7 @@ class ADwinFemto(object):
             v = np.array(self._adwin.get('data1')[start:(count - 1)]) * (20.0 / 65535) - 10.0  # get voltage digit and transform into real units
             i = np.array(self._adwin.get('data2')[start:(count - 1)]) * (20.0 / 65535) - 10.0  # get current digit transform into real units
             # in case autogain was not used, flags can still identify under/overloading
-            if not v and not i:
+            if not v.size and not i.size:
                 flag |= ADWIN_FLAG_NO_DATA
             if np.max(np.absolute(i)) < _UNDERLOAD_THRESHOLD:
                 flag |= ADWIN_FLAG_UNDERLOAD
@@ -279,7 +279,7 @@ class ADwinFemto(object):
             clock = self._adwin.get('par54')
             t = np.array(self._adwin.get('data1')[start:count]) * (clock/PROCESS_CLOCK)  # get voltage digit and transform into real units
             i = np.array(self._adwin.get('data2')[start:count]) * (20.0 / 65535) - 10.0  # get current digit transform into real units
-            if not t and not i:
+            if not t.size and not i.size:
                 flag |= ADWIN_FLAG_NO_DATA
             if np.max(np.absolute(i)) < _UNDERLOAD_THRESHOLD:
                 flag |= ADWIN_FLAG_UNDERLOAD
@@ -291,7 +291,7 @@ class ADwinFemto(object):
             v = np.array(self._adwin.get('data1')[:count]) * (20.0 / 65535) - 10.0  # get voltage digit and transform into real units
             i = np.array(self._adwin.get('data2')[:count]) * (20.0 / 65535) - 10.0  # get current digit transform into real units
             flag = self._adwin.get('par37')  # get the burn flags
-            if not v and not i:
+            if not v.size and not i.size:
                 flag |= ADWIN_FLAG_NO_DATA
             if np.max(np.absolute(i)) < _UNDERLOAD_THRESHOLD:
                 flag |= ADWIN_FLAG_UNDERLOAD
@@ -355,7 +355,7 @@ class ADwinFemto(object):
             i = np.array(self._adwin.get('data2')[:num_datapoints]) * (20.0 / 65535) - 10.0
             # in case autogain was not used, flags can still identify under/overloading
             flag = 0
-            if not v and not i:
+            if not v.size and not i.size:
                 flag |= ADWIN_FLAG_NO_DATA
             if np.max(np.absolute(i)) < _UNDERLOAD_THRESHOLD:
                 flag |= ADWIN_FLAG_UNDERLOAD
@@ -423,7 +423,7 @@ class ADwinFemto(object):
             i =  np.array(self._adwin.get('data2')[:count]) * (20.0 / 65535) - 10.0
             # in case autogain was not used, flags can still identify under/overloading
             flag = 0
-            if not v and not i:
+            if not v.size and not i.size:
                 flag |= ADWIN_FLAG_NO_DATA
             if np.max(np.absolute(i)) < _UNDERLOAD_THRESHOLD:
                 flag |= ADWIN_FLAG_UNDERLOAD
@@ -500,7 +500,7 @@ class ADwinFemto(object):
             i = np.array(self._adwin.get('data2')[:count]) * (20.0 / 65535) - 10.0  # get current digit transform into real units
             slope = np.array(self._adwin.get('data3')[:count])
             flag = self._adwin.get('par38')  # get the burn flags
-            if not v and not i:
+            if not v.size and not i.size:
                 flag |= ADWIN_FLAG_NO_DATA
             if np.max(np.absolute(i)) < _UNDERLOAD_THRESHOLD:
                 flag |= ADWIN_FLAG_UNDERLOAD
@@ -540,7 +540,7 @@ class ADwinFemto(object):
         'FPar_17 = resistance
         'FPar_18 = threshold resistance
         """
-        print('Warning: the function burn will be deprecated and is no longer supported, use eburn instead.')
+        #print('Warning: the function burn will be deprecated and is no longer supported, use eburn instead.')
         self.set_gain(self.burn_gain)
         # change the sigmoidal functions
         sigmoid_high *= 10 ** (self.burn_gain-4)
@@ -569,7 +569,7 @@ class ADwinFemto(object):
             v = np.array(self._adwin.get('data1')[:count]) * (20.0 / 65535) - 10.0  # get voltage digit and transform into real units
             i = np.array(self._adwin.get('data2')[:count]) * (20.0 / 65535) - 10.0  # get current digit transform into real units
             flag = self._adwin.get('par37')  # get the burn flags
-            if not v and not i:
+            if not v.size and not i.size:
                 flag |= ADWIN_FLAG_NO_DATA
             if np.max(np.absolute(i)) < _UNDERLOAD_THRESHOLD:
                 flag |= ADWIN_FLAG_UNDERLOAD
@@ -600,7 +600,7 @@ class ADwinFemto(object):
             t = np.array(self._adwin.get('data1')[:num_datapoints]) * (processdelay/PROCESS_CLOCK)  # get voltage digit and transform into real units
             i = np.array(self._adwin.get('data2')[:num_datapoints]) * (20.0 / 65535) - 10.0  # get current digit transform into real units
             flag = 0
-            if not t and not i:
+            if not t.size and not i.size:
                 flag |= ADWIN_FLAG_NO_DATA
             if np.max(np.absolute(i)) < _UNDERLOAD_THRESHOLD:
                 flag |= ADWIN_FLAG_UNDERLOAD

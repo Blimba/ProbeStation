@@ -14,9 +14,10 @@ class Experiment(object):
 
     def __init__(self, script_file, name, devices):
         self.script = script_file
+        print 'Importing %s/%s' % (os.getcwd(), script_file)
         self._exp = importlib.import_module(script_file)
         reload(self._exp) # in case the code was changed
-        self._instr = self._exp.init(qt)
+        self._instr = self._exp.init()
         self._name = name
         self._devices = devices
         # generate the experiment info file
@@ -34,16 +35,18 @@ class Experiment(object):
 
     def get_switch_settings(self):
         try:
-            settings = self._exp.get_switch_settings
+            settings = self._exp.get_switch_settings()
         except:
             settings = None
         return settings
 
-    def run(self, device):
+
+
+    def run(self, device, **kwargs):
         if device in self._devices:
             print("Running experiment %s on device %s" % (self.script, device))
             output = [device, str(time.time() - Experiment._t0), self.script]
-            o = self._exp.start(qt,self._instr,self._name,device)
+            o = self._exp.start(self._instr,self._name, device, **kwargs)
             if type(o) is list or type(o) is tuple:
                 for j in range(len(o)):
                     output.append(str(o[j]))

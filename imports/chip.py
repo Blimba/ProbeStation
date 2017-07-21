@@ -13,7 +13,10 @@ User callable functions:
 __init__(name, **kwargs):
 
 initialises the chip class. Usage:
-c=chip(experiment_name)
+c=Chip(experiment_name)
+
+You may pass a template here too (see below for load_template) like so:
+c=Chip(experiment_name, template='2T.ini')
 
 ------------------------------------------------------------------------------------------------------------------------
 
@@ -142,8 +145,14 @@ for the device, and otherwise nothing is returned.
 
 
 import re
-from imports.experiment import *
-
+try: from imports.experiment import *
+except:
+    class Experiment:
+        def __init__(self,*args,**kwargs):
+            pass
+        @staticmethod
+        def restart():
+            pass
 
 class Chip:
     def _w2d(self,w):
@@ -190,6 +199,9 @@ class Chip:
         self._experiments = []
         self._name = name
         Experiment.restart()
+        if 'template' in kwargs:
+            self.load_template(kwargs['template'],kwargs.get('ignore_hidden',True))
+
 
     def define_devices(self, device_square, position=(0,0), pitch=(0,0), hide_from_range=False):
         '''
@@ -253,6 +265,9 @@ class Chip:
                     self._dev_list[self._d2w(dw)+str(d)] = pos
                     
     def _dev_square_to_list(self, device_square):
+        lst = []
+        if '*' in device_square:
+            device_square = '%s%d-%s%d' % (self._cols[0], self._dev_list[self._cols[0]][0], self._cols[-1], self._dev_list[self._cols[-1]][-1])
         m = re.findall(' *([a-zA-Z]+)(\d+)-([a-zA-Z]+)(\d+)', device_square)
         for index, r in enumerate(m):
             r = list(r)
@@ -287,25 +302,24 @@ class Chip:
                     dev = self._d2w(dw)+str(d)
                     if dev in self._dev_list:
                         lst.append(dev)
-            if '*' in device_square:
-                lst=[]
-                for dev in self._dev_list:
-                    lst.append(dev)
-            return lst
+        return lst
 
     def _dev_range_to_list(self, device_range):
-        m = re.findall(' *,? *([a-zA-Z]+)(\d*)-?([a-zA-Z]*)(\d*)', device_range)
         lst = []
-
+        if '*' in device_range:
+            device_range = device_range.replace('*','%s-%s' % (self._cols[0], self._cols[-1]))
+        m = re.findall(' *,? *([a-zA-Z]+)(\d*)-?([a-zA-Z]*)(\d*)', device_range)
         for index, r in enumerate(m):
             r = list(r)
             if not r[0]: continue  # first column should be set
             if not r[1]:
                 dorow = True
                 r[1] = 1  # if first row isn't set, assume 1
-            else: dorow = False
-            if not r[2]: r[2] = r[0]  # if the second column isn't set, it should be the same as the first
-            if not r[3] and not dorow:
+            else:
+                dorow = False
+            if not r[2]:
+                r[2] = r[0]  # if the second column isn't set, it should be the same as the first
+            if not r[3] and not dorow and r[2] == r[0]:
                 r[3] = r[1]  # if it is a single device, set r3 = r1
             elif not r[3]:
                 r[3] = self._dev_list[r[2]][-1]  # if it is multiple columns, go til the end
@@ -334,11 +348,6 @@ class Chip:
                     dev = col + str(d)
                     if dev in self._dev_list:
                         lst.append(dev)
-
-        if '*' in device_range:
-            for dev in self._dev_list:
-                if re.match('\w\d+',dev):
-                    lst.append(dev)
         return lst
 
     def load_template(self, filename, ignore_hidden=True):
@@ -389,6 +398,9 @@ class Chip:
                     del self._dev_list[dev]
                     try:
                         self._dev_list[m.group(1)].remove(int(m.group(2)))
+                        if not len(self._dev_list[m.group(1)]):
+                            del self._dev_list[m.group(1)]
+                            self._cols.remove(m.group(1))
                     except:
                         pass
 
@@ -451,6 +463,7 @@ class Chip:
         :return:
         '''
         device_list = self._dev_square_to_list(devices)
+        print(device_list)
         exp = Experiment(script_file, name=self._name, devices=device_list)
         self._experiments.append(exp)
         return exp
@@ -466,8 +479,9 @@ class Chip:
 
     def get_device_from_position(self,position):
         for dev in self._dev_list:
-            if self._dev_list[dev][0] == position[0] and self._dev_list[dev][1] == position[1]:
-                return dev
+            if len(self._dev_list[dev]) > 1:
+                if self._dev_list[dev][0] == position[0] and self._dev_list[dev][1] == position[1]:
+                    return dev
         return ''
 
     @property

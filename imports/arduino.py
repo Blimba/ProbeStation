@@ -4,9 +4,10 @@ class SignalSwitch(object):
     _instr = 0
     def __init__(self):
         self.settings = {}
+        self.curr_settings = [0,0,0]
         if not SignalSwitch._instr:
             try:
-                SignalSwitch._instr = qt.instruments.create('Arduino','Arduino',address='COM10')
+                SignalSwitch._instr = qt.instruments.create('Arduino','Arduino',address='COM11')
             except:
                 print('Warning: signal switcher could not be initialised.')
                 SignalSwitch._instr = 'NA'
@@ -15,7 +16,10 @@ class SignalSwitch(object):
         if destination == 'HP' and SignalSwitch._instr == 'NA':
             print('Warning: signal switcher could not switch to HP.')
         else:
-            SignalSwitch._instr.set('pin%d' % channel, destination)
+            if self.curr_settings[channel-1] != destination:
+                print('Routing channel %d: %s' % (channel, destination))
+                SignalSwitch._instr.set('pin%d' % channel, destination)
+                self.curr_settings[channel-1] = destination
 
     def route_settings(self,settings):
         for i in range(3):

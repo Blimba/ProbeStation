@@ -42,18 +42,22 @@
 #           This function is called after all devices have been looped over. Your instruments and the experiment name are passed to the function.
 #           If your instruments require a shutdown command (or you want to terminate other things), do so here.
 #
-
 import os
-qtlab_dir = "C:/qtlab"  # the qtlab folder.
-script_dir = "C:/scripts/BartLimburg"  # folder in which the user scripts can be found
+import re
+import inspect
+import time
+qtlab_dir = os.getcwd()  # the qtlab folder.
+script_dir =  os.path.dirname(inspect.getabsfile(lambda x: 0))  # use a little cheat to get the script path.
 try: os.chdir(script_dir)
-except: raise SystemError("Error: Script directory not found!")
-from imports.chip import *
-from imports.experiment import *
+except: raise SystemError("Error: Script directory not found! This is kind of impossible.")
+from imports.chip import Chip
+from imports.experiment import Experiment
 from imports.cascade import Cascade
 from imports.arduino import SignalSwitch
+import imports.data as d
+d.basepath = '%s%s\\%s' % (d.basepath, time.strftime('%Y'), script_dir.split('\\')[-1])
 try: os.chdir(qtlab_dir)
-except: raise SystemError("Error: QTLab directory not found!")
+except: raise SystemError("Error: QTLab directory not found! This is also kind of impossible.")
 os.chdir(script_dir)
 #################################
 #                               #
@@ -65,17 +69,17 @@ os.chdir(script_dir)
 name = raw_input("Experiment codename? ")
 
 # load the chip object
-chip = Chip(name)
+chip = Chip(name=name,template='2T.ini')
 
 # load the signal switch. Does signal switching automatically based on the name of the script file. Be careful: starting your scriptname with HP will make the signal switch to HP!
 signal_switch = SignalSwitch()
 
 # loads a chip design. See imports/chip.py documentation on how to make templates for chips
-if not chip.load_template('2T.ini', ignore_hidden=False):  # ignore the hidden devices (e.g. for the T2 chip, don't run experiments on row 38)
+#if not chip.load_template('2T.ini', ignore_hidden=False):  # ignore the hidden devices (e.g. for the T2 chip, don't run experiments on row 38)
      #if the template cannot be found, we cannot run any experiments
-    raise SystemError('Chip template not found in directory (%s).' % os.getcwd())
-#chip.define_devices('a21-k37', (0,0), (400, 200))  # manually design a chip without a template file (only use this for new designs)
-#chip.limit_range('a1-l19')  # use this to cut up a standard design chip into quarters
+    #raise SystemError('Chip template not found in directory (%s).' % os.getcwd())
+#chip.define_devices('p24-w38', (0,0), (400, 200))  # manually design a chip without a template file (only use this for new designs)
+#chip.limit_range('q23-w38')  # use this to cut up a standard design chip into quarters
 
 # load the devices that should run on the current chip. Device ranges are treated by COLUMNS. i.e.:
 # 'a' -> run the entire column a (as defined in the template)
@@ -90,10 +94,11 @@ chip.load_devices('a1')
 # chip.load_from_file('exp_devices.csv')
 
 # add experiments to the chip. The device ranges are treated as SQUARES. So: b3-c4 includes devices b3, b4, c3 and c4.
-chip.add_experiment("ADwin_resistance",'a1-w38') # also perform the resistance test on row 38
-chip.add_experiment("HP_gate_traces",'a1-w37')  # signal switch will autoswitch to the HP here!
+chip.add_experiment("ADwin_resistance",'a1-w37')
+chip.add_experiment("HP_gatetrace",'a1-w37')  # signal switch will autoswitch to the HP here!
 chip.add_experiment("ADwin_electroburn",'a1-w37')
 chip.add_experiment("ADwin_IV_cycles",'a1-w37')
+chip.add_experiment("HP_gatetrace",'a1-w37')  # signal switch will autoswitch to the HP here!
 
 exp_stop_code = 'STOP'  # if this word is output by an experiment, the main script halts
 exp_skip_code = 'SKIP'  # if this word is output by an experiment, the remaining experiments are skipped and the next device will run.
@@ -124,6 +129,7 @@ os.chdir(qtlab_dir)
 # load the cascade instrument
 cascade = Cascade()
 
+print("Please make sure that the cascade probes are in the contact setting!")
 # try to find the current position of the cascade from the file.
 if not cascade.store_position_file(filename='%s/positioning/%s.dat' % (script_dir, name)) or not load_saved_position:
     # current position not found, ask the user for the current position of the cascade
@@ -184,7 +190,7 @@ for dev in chip:
                     device = dev
                 if not script:
                     break
-                exp = Experiment(script, name, dev)
+                exp = Experiment(script, name, device)
                 cascade.move_abs(chip.get_device_position(device))
                 output = exp.run(device)
 

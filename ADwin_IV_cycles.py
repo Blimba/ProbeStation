@@ -8,14 +8,14 @@
 import time
 from imports.adwin_femto import *
 from imports.functions import sleep, linear_fit_resistance, add_metric_prefix
-from imports.data import data
+from imports.data import Data
 
 def init():
     return ADwinFemto(drain=1, source=1, iv_gain=9, burn_gain=4)
 
 def start(instr,name, dev): # This function is run for every device from main.py.
     print("Measuring IV of experiment %s at device %s" % (name,dev))
-    data_IV = data(name='%s_IV' % name, dev = dev,coordinates='Vsd',values='Isd')  #create the data file
+    data_IV = Data(name='%s_IV' % name, dev = dev,coordinates='Vsd',values='Isd')  #create the data file
     data_IV.plot()
     s=time.time()
     instr.set_gain(9)
