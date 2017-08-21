@@ -8,6 +8,9 @@ class HP(object):
         self._source = source
         self._gate = gate
         self._drain = drain
+        HP.instr.set('smu_func%d' % source, 'VAR1')
+        HP.instr.set('smu_func%d' % gate, 'CONS')
+        HP.instr.set('smu_func%d' % drain, 'CONS')
         self._screen_refresh = 1 if screen_refresh else 0
 
     def write(self, v, electrode='source'):
@@ -36,6 +39,7 @@ class HP(object):
                 HP.instr.set('smu_source%d' % self._source, source)
             else:
                 HP.instr.set('smu_source%d' % self._gate, gate)
+            qt.msleep(1)
             HP.instr.measure()
             HP.instr.sweep(channel=sw,
                         start=0,
@@ -66,6 +70,7 @@ class HP(object):
                 HP.instr.set('smu_source%d' % self._source, source)
             else:
                 HP.instr.set('smu_source%d' % self._gate, gate)
+            qt.msleep(1)
             HP.instr.measure()
             v = np.array(HP.instr.get('smu_v%d' % sw))
             i = -np.array(HP.instr.get('smu_i%d' % self._drain))

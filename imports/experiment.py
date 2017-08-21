@@ -3,6 +3,7 @@ import time
 import os
 import shutil
 import qt
+from imports.data import Data
 
 class Experiment(object):
     _info_file = ''
@@ -12,24 +13,27 @@ class Experiment(object):
         Experiment._info_file=''
         Experiment._t0 = 0
 
-    def __init__(self, script_file, name, devices):
+    def __init__(self, script_file, name, devices, **kwargs):
         self.script = script_file
-        print 'Importing %s/%s' % (os.getcwd(), script_file)
-        try: self._exp = importlib.import_module('experiments.%s' % script_file)
-        except: self._exp = importlib.import_module(script_file)
+        print 'Importing %s\\%s' % (os.getcwd(), script_file)
+        self._exp = importlib.import_module('experiments.%s' % script_file)
+
         reload(self._exp) # in case the code was changed
+        if kwargs:
+            self._kwargs = kwargs
+        else:
+            self._kwargs = {}
         self._instr = self._exp.init()
         self._name = name
         self._devices = devices
         # generate the experiment info file
         if not Experiment._info_file:
-            d = qt.Data(name='%s_info' % (name))
-            d.create_file(settings_file=False)
-            d.close_file()
+            d = Data(name='%s_info' % (name))
+            d.close()
             Experiment._info_file = d.get_filepath()
             Experiment._t0 = time.time()
         # save the current python script as a copy for future lookup
-        shutil.copy(script_file+'.py', os.path.dirname(Experiment._info_file))
+        shutil.copy('experiments/%s.py' % script_file, '%s\\%s_%s.py' % (os.path.dirname(Experiment._info_file), time.strftime('%H%M%S'), script_file))
 
     def __contains__(self, item):
         return item in self._devices
@@ -45,9 +49,16 @@ class Experiment(object):
 
     def run(self, device, **kwargs):
         if device in self._devices:
+            tkwargs = {}
+            for key in self._kwargs:
+                tkwargs[key] = self._kwargs[key]
+            for key in kwargs:
+                tkwargs[key] = kwargs[key]
             print("Running experiment %s on device %s" % (self.script, device))
             output = [device, str(time.time() - Experiment._t0), self.script]
-            o = self._exp.start(self._instr,self._name, device, **kwargs)
+            for key in tkwargs:
+                output.append('%s:%s' % (key, tkwargs[key]))
+            o = self._exp.start(self._instr,self._name, device, **tkwargs)
             if type(o) is list or type(o) is tuple:
                 for j in range(len(o)):
                     output.append(str(o[j]))

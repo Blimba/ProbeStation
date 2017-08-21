@@ -7,7 +7,7 @@
 
 """
 from imports.adwin_femto import *
-from imports.functions import add_metric_prefix, linear_fit_resistance
+from imports.functions import add_metric_prefix, linear_fit_resistance, check_user_input
 from imports.data import Data
 # critical resistance at which the junction is considered a tunneling junction
 R_crit = 500e6
@@ -43,7 +43,7 @@ def trigger_flag_to_string(flags):
 def init():
     return ADwinFemto(drain=1, source=1, iv_gain=9, burn_gain=4)
 
-def start(instr, name, dev):  # This function is run for every device from main.py.
+def start(instr, name, dev, **kwargs):  # This function is run for every device from main.py.
     ####################
     #  Preset globals  #
     ####################
@@ -74,20 +74,20 @@ def start(instr, name, dev):  # This function is run for every device from main.
     Rv = 0
     Ri = 0
     while (R < R_crit and R > 0 and cont and n < num_burn_cycles):
+        check_user_input()  # check for user input (asynchronously)
         # run the burning process (ElectroBurn.bas), returns the sweep data and flags
-        [v, i, burn_flags] = instr.burn(n, ramp_up=0.5, ramp_down=150,
-                                        max_voltage=bpv,
-                                        sigmoid_high=20,
-                                        sigmoid_low=4,
-                                        sigmoid_steepness=0.6,
-                                        sigmoid_center=1.3,
-                                        process_delay=6000,
-                                        #resistance=R,
-                                        threshold_resistance=R_crit)
+        [v, i, burn_flags] = instr.eburn(v_rate_up=kwargs.get('v_rate_up',7.6), # V/s
+                                         v_rate_down=2300, # V/s
+                                         max_voltage=bpv, # V
+                                         feedback_high=36.6, # mI / s
+                                         feedback_low=6.1, # mI / s
+                                         feedback_steepness=0.6, # sigmoidal curve steepness
+                                         feedback_center=1.3, # V
+                                         threshold_resistance=R_crit) # Ohm
 
         # remember the breakpoint voltage (it is the maximum voltage from the burn cycle)
         v_max = np.max(v)
-        if not (burn_flags & ADWIN_FLAG_OVERLOAD or burn_flags & ADWIN_FLAG_BURN_I_OVERLOAD): # in case of overload, dont change the bpv
+        if not (burn_flags & ADWIN_FLAG_OVERLOAD or burn_flags & ADWIN_FLAG_BURN_I_OVERLOAD or burn_flags & ADWIN_FLAG_BURN_OHMIC): # in case of overload, dont change the bpv
             if not (burn_flags & ADWIN_FLAG_UNDERLOAD and instr.burn_gain < 8): # in case of underload at lowest gain, dont change the bpv
                 bpv = v_max
 
@@ -125,7 +125,7 @@ def start(instr, name, dev):  # This function is run for every device from main.
                     #print('> Note: gain too high, cannot measure current. Reducing gain to: %s' % instr.burn_gain)
 
         # if the burn script overloads the I or the V, stop trying after 3 times
-        if (burn_flags & ADWIN_FLAG_BURN_OHMIC or burn_flags & ADWIN_FLAG_BURN_I_OVERLOAD):
+        if (burn_flags & ADWIN_FLAG_BURN_OHMIC or (burn_flags & ADWIN_FLAG_BURN_I_OVERLOAD and instr.burn_gain == 3)):
             fail_counter = fail_counter + 1
             if (fail_counter > 2):
                 print('Three fails, deserting device...')
@@ -135,6 +135,7 @@ def start(instr, name, dev):  # This function is run for every device from main.
 
         if (burn_flags & ADWIN_FLAG_BURN_BREAKPOINT_V):
             bpv = max_voltage_increase(bpv)
+        #cont = input('Continue? (1/0): ')
 
     data_burn.close()
     info_burn.close()

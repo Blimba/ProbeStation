@@ -13,7 +13,7 @@ class Data(object):
         name = self._name
         datadir = '%s\\%s' % (basepath, name)
 
-        path = self._data._filename_generator.create_data_dir(datadir, name=name, ts=self._data._localtime, timesubdir=False)
+        path = self._data._filename_generator.create_data_dir(datadir, name=name, ts=self._data._localtime, datesubdir=True, timesubdir=False)
         tstr = time.strftime('%H%M%S', self._data._localtime)
         filename = '%s_%s.dat' % (tstr, self._data._name)
         filename = os.path.join(path, filename)
@@ -27,7 +27,10 @@ class Data(object):
             return False
         self._data._write_header()
     
-    def __init__(self, name, coordinates, values, dev=''):
+    def get_filepath(self):
+        return self._data.get_filepath()
+
+    def __init__(self, name, coordinates = [], values = [], dev=''):
         self._name = name
         self._dev = dev
         self._plots = {}

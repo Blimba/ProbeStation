@@ -1,5 +1,7 @@
 from scipy import stats
 import qt
+import thread
+
 def add_metric_prefix(d):
     """
     :param d:
@@ -32,3 +34,39 @@ def linear_fit_resistance(Vdata, Idata):
 
 def sleep(seconds):
     qt.msleep(seconds)
+
+class Input:
+    def _wait(self, lst):
+        lst.append(raw_input())
+    def __init__(self):
+        self.lst = []
+        self.waiting = True
+        thread.start_new_thread(self._wait, (self.lst,))
+    def check_input(self):
+        if self.lst:
+            del self.lst[0]
+            self.waiting = False
+            return True
+        else:
+            return False
+
+_input = Input()
+def check_user_input(str=''):
+    global _input
+    if not _input.waiting:
+        _input = Input()
+    if _input.check_input():
+        msg = ''
+        while msg != 'exit' and msg != 'continue':
+            if str:
+                msg = raw_input("Program flow paused. What would you like to do (exit/continue/%s)? " % str)
+                if msg == str:
+                    break
+            else:
+                msg = raw_input("Program flow paused. What would you like to do (exit/continue)? ")
+        if msg == 'exit':
+            print('Exiting program...')
+            raise SystemExit()
+        return msg
+    else:
+        return ''

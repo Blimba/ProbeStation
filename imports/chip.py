@@ -455,7 +455,7 @@ class Chip:
             self._run_dev_list = self._run_dev_list[index:]
         return dev
 
-    def add_experiment(self,script_file,devices='*'):
+    def add_experiment(self,script_file,devices='*',**kwargs):
         '''
         add an experiment to the experiment list. The execute_experiment function will run over experiments and run them
         :param script_file:
@@ -463,8 +463,7 @@ class Chip:
         :return:
         '''
         device_list = self._dev_square_to_list(devices)
-        print(device_list)
-        exp = Experiment(script_file, name=self._name, devices=device_list)
+        exp = Experiment(script_file, name=self._name, devices=device_list, **kwargs)
         self._experiments.append(exp)
         return exp
 
